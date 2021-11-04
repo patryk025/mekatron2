@@ -26,8 +26,8 @@ def create_hparams(hparams_string=None, verbose=False):
         # Data Parameters             #
         ################################
         load_mel_from_disk=False,
-        training_files='Koles_train.txt',
-        validation_files='Koles_val.txt',
+        training_files='filelists/ljs_audio_text_train_filelist.txt',
+        validation_files='filelists/ljs_audio_text_train_filelist.txt',
         text_cleaners=['basic_cleaners'],
 
         ################################
@@ -82,7 +82,7 @@ def create_hparams(hparams_string=None, verbose=False):
         learning_rate=1e-5,
         weight_decay=1e-6,
         grad_clip_thresh=1.0,
-        batch_size=3,
+        batch_size=1,
         mask_padding=True  # set model's padded outputs to padded values
     )
 

@@ -61,7 +61,7 @@ def prepare_dataloaders(hparams):
 
 
 def load_model(hparams):
-    model = Tacotron2(hparams).cuda()
+    model = Tacotron2(hparams)
     if hparams.fp16_run:
         model = batchnorm_to_float(model.half())
         model.decoder.attention_layer.score_mask_value = float(finfo('float16').min)

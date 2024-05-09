@@ -31,6 +31,7 @@ import json
 import torch
 import torch.utils.data
 import sys
+import numpy as np
 from scipy.io.wavfile import read
 
 # We're using the audio processing from TacoTron2 to make sure it matches
@@ -63,7 +64,7 @@ class Mel2Samp(torch.utils.data.Dataset):
     spectrogram, audio pair.
     """
     def __init__(self, training_files, segment_length, filter_length,
-                 hop_length, win_length, sampling_rate, mel_fmin, mel_fmax):
+                 hop_length, win_length, sampling_rate, mel_fmin, mel_fmax, load_mel_from_disk):
         self.audio_files = files_to_list(training_files)
         random.seed(1234)
         random.shuffle(self.audio_files)
@@ -74,8 +75,9 @@ class Mel2Samp(torch.utils.data.Dataset):
                                  mel_fmin=mel_fmin, mel_fmax=mel_fmax)
         self.segment_length = segment_length
         self.sampling_rate = sampling_rate
+        self.load_mel_from_disk = load_mel_from_disk
 
-    def get_mel(self, audio):
+    def generate_mel(self, audio):
         audio_norm = audio / MAX_WAV_VALUE
         audio_norm = audio_norm.unsqueeze(0)
         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
@@ -83,6 +85,13 @@ class Mel2Samp(torch.utils.data.Dataset):
         melspec = torch.squeeze(melspec, 0)
         return melspec
 
+    def load_mel(self, filename):
+        melspec = torch.from_numpy(np.load(filename.replace(".wav",".npy"), allow_pickle=True))
+        assert melspec.size(0) == self.stft.n_mel_channels, (
+            'Mel dimension mismatch: given {}, expected {}'.format(
+                melspec.size(0), self.stft.n_mel_channels))
+        return melspec
+    
     def __getitem__(self, index):
         # Read audio
         filename = self.audio_files[index]
@@ -98,8 +107,10 @@ class Mel2Samp(torch.utils.data.Dataset):
             audio = audio[audio_start:audio_start+self.segment_length]
         else:
             audio = torch.nn.functional.pad(audio, (0, self.segment_length - audio.size(0)), 'constant').data
-
-        mel = self.get_mel(audio)
+        if self.load_mel_from_disk:
+            mel = self.load_mel(filename)
+        else:
+            mel = self.generate_mel(audio)
         audio = audio / MAX_WAV_VALUE
 
         return (mel, audio)
@@ -135,7 +146,10 @@ if __name__ == "__main__":
 
     for filepath in filepaths:
         audio, sr = load_wav_to_torch(filepath)
-        melspectrogram = mel2samp.get_mel(audio)
+        if mel2samp.load_mel_from_disk:
+            melspectrogram = mel2samp.load_mel(filename)
+        else:
+            melspectrogram = mel2samp.generate_mel(audio)
         filename = os.path.basename(filepath)
         new_filepath = args.output_dir + '/' + filename + '.pt'
         print(new_filepath)
